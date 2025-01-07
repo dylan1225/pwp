@@ -32,7 +32,7 @@ def update(line, x1, y1, x2, y2, slope):
 def draw_line(line, frame):
 	cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 250, 250), 10)
 
-def compute_line(lines, final):
+def compute_line(lines):
     used = [False] * len(lines)
     ans = []
 
@@ -75,6 +75,51 @@ def compute_line(lines, final):
                         )
                         used[j] = True
                 ans.append([x1, y1, x2, y2])
+    return ans
+
+def compute_line1(lines, final):
+    used = [False] * len(lines)
+    ans = []
+
+    for i in range(len(lines)):
+        if used[i] == False:
+            used[i] = True
+
+            x1, y1, x2, y2 = lines[i]
+            base_slope = compute_slope(lines[i])
+
+            if base_slope < 0.1 and base_slope > -0.1:
+                for j in range(i, len(lines)):
+                    temp = compute_slope(lines[j])
+
+                    if (
+                        used[j] == False
+                        and temp < 0.1
+                        and temp > -0.1
+                        and lines[j][1] < y1 + 40
+                        and lines[j][1] > y1 - 40
+                    ):
+                        x1, y1, x2, y2 = update(
+                            lines[j], x1, y1, x2, y2, temp
+                        )
+                        used[j] = True
+
+                ans.append([x1, int((y1 + y2) / 2), x2, int((y1 + y2) / 2)])
+            else:
+                for j in range(i, len(lines)):
+                    temp = compute_slope(lines[j])
+
+                    if (
+                        used[j] == False
+                        and temp < base_slope + 0.19
+                        and temp > base_slope - 0.19
+                        # and ((x1 < lines[j][0][0] + 40 and x1 > lines[j][0][0] - 40) or (x2 < lines[j][0][2] + 40 and x2 > lines[j][0][2] - 40)) 
+                    ):
+                        x1, y1, x2, y2 = update(
+                            lines[j], x1, y1, x2, y2, temp
+                        )
+                        used[j] = True
+                ans.append([x1, y1, x2, y2])
     if final:
     	lans = []
     	for line in ans:
@@ -88,24 +133,22 @@ def compute_line(lines, final):
     	return lans
     else:
     	return ans
-
-
 def compute_center(lines, frame):
 	neg = [0, 0, 0, 0]
 	pos = [0, 0, 0, 0]
 
 	for line in lines:
-		if compute_slope(line) > 0.5 and compute_length(line) > compute_length(pos):
+		if compute_slope(line) > -0.2 and compute_length(line) > compute_length(pos):
 			pos = line.copy()
-		elif compute_slope(line) < -0.5 and compute_length(line) > compute_length(neg):
+		elif compute_slope(line) < 0.2 and compute_length(line) > compute_length(neg):
 			neg = line.copy()
 
 	positive_slope = compute_slope(pos)
 	negative_slope = compute_slope(neg)
 
 	if (
-		-negative_slope > positive_slope - 0.5
-		and -negative_slope < positive_slope + 0.5):
+		abs(negative_slope) > abs(positive_slope) - 1.5
+		and abs(negative_slope) < abs(positive_slope) + 1.5):
 		if neg[3] > pos[1]:
 			if negative_slope != 0:
 				neg[2] = int(neg[2] - (neg[3] - pos[1]) / negative_slope)
@@ -139,7 +182,7 @@ def per_tran(lines, frame, center, lines1):
 		[lines[0][2], lines[0][3]], 
 		[lines[1][2], lines[1][3]]
 		]
-	if not (src[0][0] > src[1][0] - 90 and src[0][0] < src[1][0] + 90):
+	if not (src[0][0] > src[1][0] - 140 and src[0][0] < src[1][0] + 140):
 		center = compute_center(lines1, frame)
 		if compute_slope(center) != 0:
 			temp = np.zeros_like(frame)
@@ -174,12 +217,13 @@ def process_frame(frame):
     #     for line in lines:
     #         print(compute_slope(line[0]))
     if lines is not None:
-        n_lines1 = compute_line(lines, False)
-        n_lines = compute_line(lines, True)
+        n_lines1 = compute_line(lines)
+        n_lines1 = compute_line1(n_lines1, False)
+        n_lines = compute_line1(n_lines1, True)
         if len(n_lines) == 2:
         	left = abs(compute_slope(n_lines[0]))
         	right = abs(compute_slope(n_lines[1]))
-        	if right < left + 0.9 and right > left - 0.9 and compute_length(n_lines[0]) < compute_length(n_lines[1]) + 50 and compute_length(n_lines[0]) > compute_length(n_lines[1]) - 50:
+        	if right < left + 1.5 and right > left - 1.5 and compute_length(n_lines[0]) < compute_length(n_lines[1]) + 100 and compute_length(n_lines[0]) > compute_length(n_lines[1]) - 100:
         		draw_line(n_lines[0], frame)
         		draw_line(n_lines[1], frame)
         		frame = per_tran(n_lines, frame, centerline, n_lines1)
